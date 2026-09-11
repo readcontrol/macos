@@ -27,6 +27,11 @@ struct ArticleDetailView: View {
     /// each open, so toggles made elsewhere still show on return.
     @State var cache = ArticleDocumentCache()
 
+    /// Records where the user stops in the open article, and goes back to that
+    /// block when the article opens again (see `ReaderPositionTracker`). The
+    /// loading pipeline hands it each document with the stored position.
+    @State var positionTracker = ReaderPositionTracker()
+
     /// Drives the full-screen image-zoom overlay: injected into the reader's
     /// environment so a clicked figure can raise the lightbox, and observed to
     /// present it over the whole detail pane (see `ImageLightbox`) and to drop the
@@ -166,9 +171,20 @@ struct ArticleDetailView: View {
             onHighlight: { text in
                 Task { await appState.toggleHighlight(id: row.id, text: text) }
             },
+            onScrollReady: { positionTracker.scrollReady($0) },
+            onScrollSettle: { positionTracker.scrollSettled($0) },
             header: { ArticleHeaderView(row: row, theme: theme) },
             footer: { ratingFooter(row: row) }
         )
+        // A change of face, size, measure, or leading lays the text out again.
+        // Keep the block the reader last saw at the top of the window.
+        .onChange(of: typographyKey) { positionTracker.keepAnchor() }
+    }
+
+    /// The reader typography, as one value, so a change of any part of it is one
+    /// change to watch.
+    private var typographyKey: String {
+        "\(readerFont.rawValue)|\(readerFontSize.rawValue)|\(readerWidth.rawValue)|\(readerLineHeight.rawValue)"
     }
 
     /// Excerpt-only fallback when there's no parsed body to show.

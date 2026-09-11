@@ -34,6 +34,11 @@ protocol CoreBridging: Sendable {
     @discardableResult func addHighlight(readingId: String, text: String) async throws -> FfiHighlight
     @discardableResult func toggleHighlight(readingId: String, text: String) async throws -> Bool
     func deleteHighlight(readingId: String, highlightId: String) async throws
+
+    func getPosition(readingId: String) async throws -> FfiPosition?
+    @discardableResult func setPosition(readingId: String, block: UInt32, quote: String,
+                                        percent: Float) async throws -> FfiPosition?
+    func clearPosition(readingId: String) async throws
 }
 
 /// CoreBridge already implements every requirement; this just records the

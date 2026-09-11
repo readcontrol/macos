@@ -9,7 +9,8 @@ func makeReadingRow(
     read: Bool = false,
     archived: Bool = false,
     favorite: Bool = false,
-    wordCount: UInt32? = nil
+    wordCount: UInt32? = nil,
+    progress: Float? = nil
 ) -> ReadingRow {
     ReadingRow(
         id: "01JQ0000000000000000000000",
@@ -26,6 +27,7 @@ func makeReadingRow(
         excerpt: nil,
         wordCount: wordCount,
         lang: nil,
-        tags: []
+        tags: [],
+        progress: progress
     )
 }

@@ -24,6 +24,10 @@ struct ReadingRow: Identifiable, Equatable, Sendable {
     var wordCount: UInt32?
     var lang: String?
     var tags: [String]
+    /// How far the user read before the reading position, from 0 to 1. It is
+    /// nil when the reading has no position. The index caches it from the
+    /// reading's `position.md`.
+    var progress: Float?
 }
 
 extension ReadingRow {
@@ -46,5 +50,6 @@ extension ReadingRow {
         wordCount = row.wordCount
         lang = row.lang
         tags = row.tags
+        progress = row.progress
     }
 }

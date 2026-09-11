@@ -87,6 +87,18 @@ targets:
       # every measure/leading value from it. Pure value types, no FFI.
       - path: Sources/ReadControl/Shared/Preferences/TypographySettings.swift
       - path: Sources/ReadControl/Features/Reader/Markdown/MarkdownTheme.swift
+      # The reading position: the anchors of an article (block index, quote,
+      # progress), the parsed document they come from, and the text run that
+      # reports where each block starts. Parsing and anchoring are pure logic —
+      # no window, no app — so they belong in the hostless suite. They pull the
+      # Markdown package and the inline renderers that turn a block into text.
+      - path: Sources/ReadControl/Features/Reader/Article/ArticleAnchors.swift
+      - path: Sources/ReadControl/Features/Reader/Article/ArticleDocument.swift
+      - path: Sources/ReadControl/Features/Reader/Markdown/IdentifiedMarkup.swift
+      - path: Sources/ReadControl/Features/Reader/Markdown/MarkdownTextRun.swift
+      - path: Sources/ReadControl/Features/Reader/Markdown/InlineRenderer.swift
+      - path: Sources/ReadControl/Features/Reader/Markdown/AppKitInline.swift
+      - path: Sources/ReadControl/Features/Reader/Markdown/ReaderTextView.swift
       - path: Sources/ReadControl/Bridge/Mappers/ReadingRow.swift
       - path: Sources/ReadControl/Bridge/Mappers/SidebarCountModels.swift
       - path: Sources/ReadControl/Bridge/Mappers/HighlightRow.swift
@@ -100,6 +112,8 @@ targets:
       - framework: Frameworks/ReadControlCore.xcframework
         embed: false
       - sdk: SystemConfiguration.framework
+      # The anchor tests parse Markdown, exactly as the reader does.
+      - package: Markdown
     settings:
       base:
         SWIFT_VERSION: "6.0"

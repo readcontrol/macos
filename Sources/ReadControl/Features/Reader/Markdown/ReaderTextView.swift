@@ -31,6 +31,42 @@ final class ReaderTextView: NSTextView {
     /// can offer "Remove Highlight" when the selection matches one.
     var highlights: [String] = []
 
+    /// Where each top-level block of this run starts in the text.
+    var blockOffsets: [Int] = []
+
+    /// The position, among all blocks of the article, of the first block in
+    /// this run. The reader adds the position inside the run to it.
+    var firstBlock: Int = 0
+
+    /// The block shown at `point`, in the view's own coordinates, counted among
+    /// all blocks of the article. The reader asks the run at the top of the
+    /// window, thus it learns where the user stopped.
+    func block(at point: CGPoint) -> Int? {
+        guard let layoutManager, let textContainer, !blockOffsets.isEmpty else { return nil }
+        let inText = CGPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        let character = layoutManager.characterIndex(
+            for: inText, in: textContainer, fractionOfDistanceBetweenInsertionPoints: nil
+        )
+        let local = blockOffsets.lastIndex { $0 <= character } ?? 0
+        return firstBlock + local
+    }
+
+    /// Where the block at `block` starts, in the view's own coordinates. Nil
+    /// when this run does not hold that block. The reader adds the position of
+    /// the view in the scroll, thus it can go to the block again.
+    func top(ofBlock block: Int) -> CGFloat? {
+        let local = block - firstBlock
+        guard blockOffsets.indices.contains(local),
+              let layoutManager, let textContainer else { return nil }
+        layoutManager.ensureLayout(for: textContainer)
+        let glyphs = layoutManager.glyphRange(
+            forCharacterRange: NSRange(location: blockOffsets[local], length: 0),
+            actualCharacterRange: nil
+        )
+        return layoutManager.boundingRect(forGlyphRange: glyphs, in: textContainer).minY
+            + textContainerOrigin.y
+    }
+
     static func make() -> ReaderTextView {
         let storage = NSTextStorage()
         let layoutManager = ReaderLayoutManager()

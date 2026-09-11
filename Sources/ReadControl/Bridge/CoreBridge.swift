@@ -122,4 +122,29 @@ actor CoreBridge {
     func deleteHighlight(readingId: String, highlightId: String) throws {
         try database.deleteHighlight(libraryPath: libraryPath, readingId: readingId, highlightId: highlightId)
     }
+
+    // ── Reading position ──────────────────────────────────────────────────
+
+    /// Where the user stopped in a reading. Nil when the reading has no
+    /// position, or when its position file is damaged.
+    func getPosition(readingId: String) throws -> FfiPosition? {
+        try database.getPosition(libraryPath: libraryPath, readingId: readingId)
+    }
+
+    /// Record where the user stopped: the index of the anchor block, the start
+    /// of that block, and the progress before it. Returns the stored position.
+    /// The core returns nil when it clears the position, because block 0 is the
+    /// start of the article.
+    @discardableResult
+    func setPosition(readingId: String, block: UInt32, quote: String,
+                     percent: Float) throws -> FfiPosition?
+    {
+        try database.setPosition(libraryPath: libraryPath, readingId: readingId,
+                                 block: block, quote: quote, percent: percent)
+    }
+
+    /// Remove the reading position. The next open starts at the top.
+    func clearPosition(readingId: String) throws {
+        try database.clearPosition(libraryPath: libraryPath, readingId: readingId)
+    }
 }

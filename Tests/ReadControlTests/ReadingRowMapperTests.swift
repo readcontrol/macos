@@ -24,7 +24,8 @@ final class ReadingRowMapperTests: XCTestCase {
             excerpt: "A short excerpt.",
             wordCount: 1234,
             lang: "en",
-            tags: ["rust", "local-first"]
+            tags: ["rust", "local-first"],
+            progress: 0.42
         )
     }
 
@@ -46,6 +47,7 @@ final class ReadingRowMapperTests: XCTestCase {
         XCTAssertEqual(row.wordCount, ffi.wordCount)
         XCTAssertEqual(row.lang, ffi.lang)
         XCTAssertEqual(row.tags, ffi.tags)
+        XCTAssertEqual(row.progress, ffi.progress)
     }
 
     func testOptionalFieldsPreserveNil() {
@@ -64,7 +66,8 @@ final class ReadingRowMapperTests: XCTestCase {
             excerpt: nil,
             wordCount: nil,
             lang: nil,
-            tags: []
+            tags: [],
+            progress: nil
         )
         let row = ReadingRow(ffi)
         XCTAssertNil(row.author)
@@ -73,6 +76,7 @@ final class ReadingRowMapperTests: XCTestCase {
         XCTAssertNil(row.wordCount)
         XCTAssertNil(row.lang)
         XCTAssertTrue(row.tags.isEmpty)
+        XCTAssertNil(row.progress)
     }
 
     func testEqualityTracksFields() {

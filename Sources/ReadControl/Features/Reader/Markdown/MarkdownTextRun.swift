@@ -32,9 +32,28 @@ enum MarkdownTextRun {
         var bars: [CGFloat] = []
     }
 
+    /// One built run: the text to show, plus where each top-level block starts
+    /// in it. The reader needs the offsets to name the block at the top of the
+    /// window, and to scroll back to a block it recorded before.
+    struct Built {
+        var attributed: NSAttributedString
+        /// Character offset in `attributed` of each block, in the order given.
+        /// A block that emits nothing keeps the offset of the next one.
+        var blockOffsets: [Int]
+    }
+
     static func attributed(_ blocks: [Markup], theme: MarkdownTheme) -> NSAttributedString {
+        build(blocks, theme: theme).attributed
+    }
+
+    /// Build the run and report where each top-level block starts in it.
+    static func build(_ blocks: [Markup], theme: MarkdownTheme) -> Built {
         var paras: [Para] = []
+        // The index in `paras` where each block's first paragraph begins. A block
+        // that emits no paragraph shares the index of the block after it.
+        var paraStarts: [Int] = []
         for (index, block) in blocks.enumerated() {
+            paraStarts.append(paras.count)
             var blockParas = emit(block, theme: theme, ctx: Ctx())
             guard !blockParas.isEmpty else { continue }
             // Leading gap for this top-level block: the inter-block rhythm, plus
@@ -47,8 +66,11 @@ enum MarkdownTextRun {
         }
 
         let out = NSMutableAttributedString()
+        // Character offset in `out` where each paragraph starts.
+        var paraOffsets: [Int] = []
         for (index, para) in paras.enumerated() {
             let start = out.length
+            paraOffsets.append(start)
             out.append(para.content)
             // Terminate every paragraph but the last; the newline belongs to the
             // current paragraph's range so its style covers the terminator.
@@ -59,7 +81,11 @@ enum MarkdownTextRun {
             out.addAttribute(.paragraphStyle, value: para.style,
                              range: NSRange(location: start, length: out.length - start))
         }
-        return out
+
+        let blockOffsets = paraStarts.map { start in
+            start < paraOffsets.count ? paraOffsets[start] : out.length
+        }
+        return Built(attributed: out, blockOffsets: blockOffsets)
     }
 
     // ── Block emitters ───────────────────────────────────────────────────────

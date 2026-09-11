@@ -52,6 +52,7 @@ extension ArticleDetailView {
             bodyTooLarge = false
             isLoading = false
             loadHighlightsInBackground(id: id)
+            await startTracking(id: id, document: cached.document)
             await revalidate(id: id, cachedBody: cached.body)
             return
         }
@@ -108,6 +109,25 @@ extension ArticleDetailView {
         // it over the reading now on screen if the user moved on.
         guard appState.selectedId == id else { return }
         articleDocument = document
+        await startTracking(id: id, document: document)
+    }
+
+    /// Give the position tracker the article the reader now shows, with the
+    /// position the core stored for it. The tracker goes to that block, and from
+    /// then on it records the block at the top of the window.
+    ///
+    /// The fetch of the position is one small file read, and it runs after the
+    /// article is on screen, so it never holds the reader back.
+    private func startTracking(id: String, document: ArticleDocument) async {
+        positionTracker.onRecord = { readingID, anchor in
+            Task {
+                await appState.recordPosition(id: readingID, block: anchor.block,
+                                              quote: anchor.quote, percent: anchor.percent)
+            }
+        }
+        let position = await appState.position(id: id)
+        guard appState.selectedId == id else { return }
+        positionTracker.open(readingID: id, document: document, position: position)
     }
 
     /// Fetch the reading's highlights *off* the reader's critical path.

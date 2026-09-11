@@ -16,6 +16,11 @@ import SwiftUI
 /// plain attributed text cannot express.
 struct SelectableTextView: NSViewRepresentable {
     let attributed: NSAttributedString
+    /// Where each top-level block of the run starts in `attributed`, and the
+    /// position of the first of them among the article's blocks. The reader
+    /// records and restores a reading position with both (see `ReaderTextView`).
+    var blockOffsets: [Int] = []
+    var firstBlock: Int = 0
     /// Verbatim text of every highlight for this reading. Each exact occurrence
     /// found in this run is tinted.
     var highlights: [String] = []
@@ -27,6 +32,8 @@ struct SelectableTextView: NSViewRepresentable {
         let textView = ReaderTextView.make()
         textView.onHighlight = onHighlight
         textView.highlights = highlights
+        textView.blockOffsets = blockOffsets
+        textView.firstBlock = firstBlock
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
@@ -64,6 +71,8 @@ struct SelectableTextView: NSViewRepresentable {
         guard let storage = textView.textStorage else { return }
         textView.onHighlight = onHighlight
         textView.highlights = highlights
+        textView.blockOffsets = blockOffsets
+        textView.firstBlock = firstBlock
         if textView.baseAttributed?.isEqual(attributed) != true {
             storage.setAttributedString(attributed)
             textView.baseAttributed = attributed.copy() as? NSAttributedString
