@@ -125,6 +125,9 @@ extension ArticleDetailView {
                                               quote: anchor.quote, percent: anchor.percent)
             }
         }
+        positionTracker.onReachEnd = { readingID in
+            Task { await appState.markRead(id: readingID) }
+        }
         let position = await appState.position(id: id)
         guard appState.selectedId == id else { return }
         positionTracker.open(readingID: id, document: document, position: position)

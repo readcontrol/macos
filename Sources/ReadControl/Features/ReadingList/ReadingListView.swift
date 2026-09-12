@@ -289,16 +289,11 @@ struct ReadingRowView: View {
     let row: ReadingRow
 
     var body: some View {
-        // The unread dot lives in its own fixed-width leading column so the
+        // The indicator lives in its own fixed-width leading column so the
         // title, author and excerpt all share the same text column, aligned
-        // whether or not the dot is present.
+        // whether or not the indicator is present (see `ReadingIndicator`).
         HStack(alignment: .top, spacing: 8) {
-            Circle()
-                .fill(.blue)
-                .frame(width: 7, height: 7)
-                .padding(.top, 6)
-                .opacity(row.read ? 0 : 1)
-                .accessibilityLabel(row.read ? "" : "Unread")
+            ReadingIndicatorView(indicator: .forRow(row))
 
             VStack(alignment: .leading, spacing: 4) {
                 // Title + indicators

@@ -26,11 +26,22 @@ final class ReaderPositionTracker {
     /// Called with the anchor to store. The reader sends it to the core.
     var onRecord: (String, ArticleAnchors.Anchor) -> Void = { _, _ in }
 
+    /// Called once, when the user reaches the end of the article. The reader
+    /// marks the reading read.
+    var onReachEnd: (String) -> Void = { _ in }
+
     private var readingID: String?
     private var document: ArticleDocument?
     /// The scroll the reader shows this article in, kept so a typography change
     /// can put the anchor block back at the top.
     private weak var scrollView: NSScrollView?
+    /// True once the scroll offset moved, which only the user does. A window
+    /// resize changes the size of the visible area, not the offset.
+    private var userScrolled = false
+    /// The offset at the last stop, to see whether the scroll moved.
+    private var lastOffset: CGFloat?
+    /// True once the reader reported the end, so it reports it one time only.
+    private var reportedEnd = false
     /// The block to go to, until a restore reaches it.
     private var wanted: Int?
     /// The block of the last report, so an unchanged anchor writes nothing.
@@ -46,6 +57,9 @@ final class ReaderPositionTracker {
         readingID = id
         self.document = document
         lastRecorded = nil
+        userScrolled = false
+        lastOffset = nil
+        reportedEnd = false
         isRestoring = position != nil
         wanted = position.flatMap {
             document.blockToRestore(block: $0.block, quote: $0.quote, percent: $0.percent)
@@ -62,14 +76,38 @@ final class ReaderPositionTracker {
         Task { await restore(to: wanted, in: scrollView) }
     }
 
-    /// The scroll stopped. Record the block at the top of the window.
+    /// The scroll stopped. Report the end of the article, or record the block
+    /// at the top of the window.
     func scrollSettled(_ scrollView: NSScrollView) {
         self.scrollView = scrollView
         guard !isRestoring, let readingID, let document else { return }
+
+        let offset = scrollView.contentView.bounds.origin.y
+        if let lastOffset, offset != lastOffset {
+            userScrolled = true
+        }
+        lastOffset = offset
+
+        if !reportedEnd, reachedEnd(in: scrollView) {
+            reportedEnd = true
+            onReachEnd(readingID)
+            return
+        }
+
         guard let block = topBlock(in: scrollView), block != lastRecorded else { return }
         guard let anchor = document.anchors.anchor(at: block) else { return }
         lastRecorded = block
         onRecord(readingID, anchor)
+    }
+
+    /// Whether the end of the article stands in the window.
+    private func reachedEnd(in scrollView: NSScrollView) -> Bool {
+        guard let documentView = scrollView.documentView else { return false }
+        return EndOfArticle.reached(
+            visibleBottom: scrollView.contentView.bounds.maxY,
+            contentHeight: documentView.bounds.height,
+            userScrolled: userScrolled
+        )
     }
 
     /// The typography changed, so the text laid out again. Put the block the

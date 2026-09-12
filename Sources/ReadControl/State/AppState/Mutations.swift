@@ -63,6 +63,26 @@ extension AppState {
         await refresh()
     }
 
+    /// Mark a reading read because the user reached its end. A reading that is
+    /// already read stays as it is, so its read date keeps the time the user
+    /// first finished it. The core clears the reading position.
+    func markRead(id: String) async {
+        guard let core else { return }
+        if let row = readings.first(where: { $0.id == id }) {
+            guard !row.read else { return }
+            var updated = row
+            updated.read = true
+            updated.progress = nil
+            applyOptimistic(row, updated)
+            advancePastFilteredRow(id: id)
+        }
+        try? await core.setRead(id: id, read: true)
+        // Marking read keeps the reading position in the core, so clear it here:
+        // the article is finished, thus the next open starts at the top.
+        try? await core.clearPosition(readingId: id)
+        await refresh()
+    }
+
     func toggleFavorite(_ row: ReadingRow) async {
         guard let core else { return }
         var updated = row
