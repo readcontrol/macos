@@ -8,11 +8,9 @@ import Foundation
 struct ReadingPosition: Equatable, Sendable {
     /// 0-based index of the anchor block in the body.
     var block: Int
-    /// The start of the anchor block, on one line.
     var quote: String
-    /// How far the user read before the anchor block, from 0 to 1.
     var percent: Float
-    /// UTC time of the last change. The library format calls the field `at`.
+    /// The library format calls this field `at`.
     var changedAt: String
 }
 

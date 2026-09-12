@@ -30,8 +30,7 @@ struct BlockAnchorMarker: NSViewRepresentable {
 final class BlockAnchorView: NSView {
     var block: Int = 0
 
-    /// Let every click through to the content above, and to the background that
-    /// clears the text selection.
+    /// Never take a click; the content above must keep receiving them.
     override func hitTest(_: NSPoint) -> NSView? {
         nil
     }

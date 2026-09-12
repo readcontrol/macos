@@ -269,10 +269,6 @@ private struct MarkdownTableView: View {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-// `IdentifiedMarkup` — the stable identity these views key on — lives in
-// `IdentifiedMarkup.swift`, so the hostless unit tests can compile it without
-// the view layer.
-
 private func childArray(_ markup: Markup) -> [IdentifiedMarkup] {
     Array(markup.children).enumerated().map {
         IdentifiedMarkup(id: IdentifiedMarkup.stableID(for: $0.element, fallbackIndex: $0.offset),

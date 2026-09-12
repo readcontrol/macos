@@ -4,9 +4,6 @@ import AppKit
 import Markdown
 import SwiftUI
 
-// `ArticleDocument` — the parsed structure this view renders — lives in
-// `Features/Reader/Article/ArticleDocument.swift`.
-
 /// Native reader: renders a pre-parsed `ArticleDocument` as a SwiftUI view tree.
 /// Replaces the `WKWebView`-based `MarkdownWebView`. Light/Dark adapt
 /// automatically via semantic colors (appearance is applied app-wide in
