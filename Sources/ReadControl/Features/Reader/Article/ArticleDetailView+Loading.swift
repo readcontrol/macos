@@ -25,13 +25,10 @@ extension ArticleDetailView {
         // by `.task(id:)` — does no work for a reading skimmed past: no fetch, no
         // parse, and no main-thread rebuild of the reader tree, which swapping in even
         // a cached document costs and is what made navigating opened readings stutter.
-        do {
-            try await Task.sleep(for: .milliseconds(120))
-        } catch {
-            return
-        }
+        guard (try? await Task.sleep(for: .milliseconds(120))) != nil else { return }
 
-        let newRow = appState.readings.first(where: { $0.id == id })
+        let newRow = await listedOrIndexedRow(id: id)
+        guard appState.selectedId == id else { return }
 
         // Short-circuit a pathological body straight to the oversize notice from the
         // cheap indexed word count — before fetching and parsing megabytes of text,
@@ -64,6 +61,16 @@ extension ArticleDetailView {
         await loadUncached(id: id)
     }
 
+    /// The row of the reading `id`: from the list, or else from the index. The
+    /// list does not show every open reading, e.g. the last reading at launch
+    /// can be on a later page or outside the filter.
+    private func listedOrIndexedRow(id: String) async -> ReadingRow? {
+        if let listed = appState.readings.first(where: { $0.id == id }) {
+            return listed
+        }
+        return await appState.reloadRow(id: id)
+    }
+
     /// The cache-miss tail: fetch the body from the core, then parse it off the main
     /// thread (see `ArticleDocument.parse`). Reached only past `load`'s debounce, so a
     /// reading skimmed past never gets here.
@@ -82,7 +89,9 @@ extension ArticleDetailView {
         // can't paint over — or clear the spinner of — the reading now loading.
         guard appState.selectedId == id else { return }
         guard let document = await parse(body: body, id: id) else {
-            if appState.selectedId == id { isLoading = false }
+            if appState.selectedId == id {
+                isLoading = false
+            }
             return
         }
         let stored = await position

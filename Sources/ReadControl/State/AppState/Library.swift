@@ -69,6 +69,9 @@ extension AppState {
             let bridge = try CoreBridge(libraryPath: url.path, dbPath: Self.dbPath())
             try await bridge.rebuild()
             core = bridge
+            // Before `libraryURL` shows the reading list, so the list never
+            // selects its first row in place of the last reading.
+            await resumeLastReading(core: bridge)
             libraryURL = url
             // Host-machine side effects (the ~/.config/readcontrol/library file
             // and the browser native-messaging manifest) are neutralized under
@@ -84,6 +87,17 @@ extension AppState {
         }
         isLoading = false
         isRestoringLibrary = false
+    }
+
+    /// Open the reading the user had open: the current selection when the user
+    /// picks another library, or else the reading open when the app quit. The
+    /// list can not show that reading (another filter, a later page), thus ask
+    /// the index. When the index does not have it (deleted, or from another
+    /// library), clear the selection, and the list selects its first row.
+    private func resumeLastReading(core: any CoreBridging) async {
+        guard let id = selectedId ?? lastReadingId else { return }
+        let exists = await (try? core.getReadingRow(id: id)) != nil
+        selectedId = exists ? id : nil
     }
 
     /// Write the library path to ~/.config/readcontrol/library so the native

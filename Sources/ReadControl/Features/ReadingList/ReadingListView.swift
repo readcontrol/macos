@@ -40,7 +40,9 @@ struct ReadingListView: View {
         .onChange(of: appState.searchQuery) { _, _ in
             appState.searchDidChange()
         }
-        .task { await appState.loadReadings() }
+        // Keep a selection that is not in the list: at launch it is the last
+        // reading, which can be on a later page or outside the filter.
+        .task { await appState.loadReadings(resetSelectionIfMissing: false) }
         .onChange(of: appState.sortField) { _, _ in
             Task { await appState.loadReadings() }
         }

@@ -25,6 +25,8 @@ final class AppState {
         static let tag = "selectedTag"
         static let rating = "selectedRating"
         static let search = "searchQuery"
+        /// The reading open when the app quit, so reopening the app opens it again.
+        static let reading = "selectedReadingId"
     }
 
     private enum ExtensionSetupKey {
@@ -62,7 +64,21 @@ final class AppState {
     }
 
     var readings: [ReadingRow] = []
-    var selectedId: String?
+
+    /// The open reading. Persisted across launches, so the app opens the last
+    /// reading again (see `resumeLastReading`). The reading can be outside the
+    /// list: on a page not loaded yet, or not in the current filter.
+    var selectedId: String? {
+        didSet {
+            guard selectedId != oldValue else { return }
+            AppDefaults.store.set(selectedId, forKey: FilterDefaultsKey.reading)
+        }
+    }
+
+    /// The reading that was open when the app quit, if any.
+    var lastReadingId: String? {
+        AppDefaults.store.string(forKey: FilterDefaultsKey.reading)
+    }
 
     /// The reading-list search text, persisted across launches so a search the
     /// user left active is restored on reopen. `init` seeds it from the store.
