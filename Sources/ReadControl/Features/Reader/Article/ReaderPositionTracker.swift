@@ -90,7 +90,9 @@ final class ReaderPositionTracker {
             let opened = generation
             Task {
                 try? await Task.sleep(for: Self.revealTimeout)
-                if generation == opened { hidesArticle = false }
+                if generation == opened {
+                    hidesArticle = false
+                }
             }
         }
         startRestoreIfReady()
@@ -151,7 +153,9 @@ final class ReaderPositionTracker {
 
         let offset = scrollView.contentView.bounds.origin.y
         if let startOffset {
-            if offset != startOffset { userScrolled = true }
+            if offset != startOffset {
+                userScrolled = true
+            }
         } else {
             startOffset = offset
         }
@@ -205,7 +209,9 @@ final class ReaderPositionTracker {
             scrollView.layoutSubtreeIfNeeded()
             if let top = documentTop(ofBlock: block, in: scrollView) {
                 scroll(scrollView, to: top)
-                if let previousTop, abs(top - previousTop) < 1 { break }
+                if let previousTop, abs(top - previousTop) < 1 {
+                    break
+                }
                 previousTop = top
             } else if pass == 0, let percent = document?.anchors.anchor(at: block)?.percent {
                 scroll(scrollView, to: approximateTop(percent: percent, in: scrollView))
