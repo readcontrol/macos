@@ -66,21 +66,45 @@ extension AppState {
     /// Mark a reading read because the user reached its end. A reading that is
     /// already read stays as it is, so its read date keeps the time the user
     /// first finished it. The core clears the reading position.
-    func markRead(id: String) async {
-        guard let core else { return }
+    ///
+    /// The user is still in the article, thus the selection stays on it and the
+    /// reader keeps it open. When the reading no longer matches the current
+    /// filter (e.g. the Unread view), its row leaves the list, but the selection
+    /// does not move to another row. Returns the refreshed row, so the reader
+    /// can update its own copy.
+    @discardableResult
+    func markRead(id: String) async -> ReadingRow? {
+        guard let core else { return nil }
         if let row = readings.first(where: { $0.id == id }) {
-            guard !row.read else { return }
+            guard !row.read else { return row }
             var updated = row
             updated.read = true
             updated.progress = nil
             applyOptimistic(row, updated)
-            advancePastFilteredRow(id: id)
+            dropFilteredRowKeepingSelection(id: id)
         }
         try? await core.setRead(id: id, read: true)
         // Marking read keeps the reading position in the core, so clear it here:
         // the article is finished, thus the next open starts at the top.
         try? await core.clearPosition(readingId: id)
         await refresh()
+        if let row = readings.first(where: { $0.id == id }) {
+            return row
+        }
+        guard let fetched = try? await core.getReadingRow(id: id) else { return nil }
+        return ReadingRow(fetched)
+    }
+
+    /// Remove the row from the list when it no longer matches the current
+    /// filter, and keep the selection on it. The reader still shows the reading.
+    /// Skipped during search, whose results span every view.
+    private func dropFilteredRowKeepingSelection(id: String) {
+        guard searchQuery.isEmpty,
+              let index = readings.firstIndex(where: { $0.id == id }),
+              !rowMatchesCurrentFilter(readings[index]) else { return }
+        withAnimation {
+            _ = readings.remove(at: index)
+        }
     }
 
     func toggleFavorite(_ row: ReadingRow) async {

@@ -137,7 +137,13 @@ extension ArticleDetailView {
             }
         }
         positionTracker.onReachEnd = { readingID in
-            Task { await appState.markRead(id: readingID) }
+            Task {
+                let updated = await appState.markRead(id: readingID)
+                // The reader keeps the reading open, thus its own copy of the row
+                // must show the read state, e.g. for the toolbar.
+                guard appState.selectedId == readingID, row?.id == readingID, let updated else { return }
+                row = updated
+            }
         }
         positionTracker.open(readingID: id, document: document, position: position)
         row = newRow
