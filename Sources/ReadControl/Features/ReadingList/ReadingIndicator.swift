@@ -3,25 +3,19 @@
 import SwiftUI
 
 /// What the leading column of a reading row shows.
+///
+/// How far into a reading the user got is kept in the reading's `position.md`
+/// and in the index, but the list does not show it: the column says whether a
+/// reading is waiting, and nothing more.
 enum ReadingIndicator: Equatable {
     /// The reading is read. The column stays empty.
     case none
-    /// The reading is unread and the user did not start it.
+    /// The reading is unread.
     case unread
-    /// The reading is unread and the user stopped inside it, at this progress.
-    case progress(Float)
 
-    /// The indicator for a row. A read reading shows nothing, even when it
-    /// still holds a reading position. A position at the very start counts as
-    /// not started.
+    /// The indicator for a row.
     static func forRow(_ row: ReadingRow) -> ReadingIndicator {
-        if row.read {
-            return .none
-        }
-        guard let progress = row.progress, progress > 0 else {
-            return .unread
-        }
-        return .progress(min(progress, 1))
+        row.read ? .none : .unread
     }
 
     /// What VoiceOver reads for the column.
@@ -29,7 +23,6 @@ enum ReadingIndicator: Equatable {
         switch self {
         case .none: ""
         case .unread: "Unread"
-        case let .progress(value): "\(Int((value * 100).rounded())) percent read"
         }
     }
 }
@@ -41,9 +34,8 @@ struct ReadingIndicatorView: View {
     let indicator: ReadingIndicator
 
     private let columnWidth: CGFloat = 10
+    private let columnHeight: CGFloat = 9
     private let dotSize: CGFloat = 7
-    private let ringSize: CGFloat = 9
-    private let ringStroke: CGFloat = 1.5
 
     var body: some View {
         ZStack {
@@ -54,27 +46,10 @@ struct ReadingIndicatorView: View {
                 Circle()
                     .fill(.blue)
                     .frame(width: dotSize, height: dotSize)
-            case let .progress(value):
-                ring(value)
             }
         }
-        .frame(width: columnWidth, height: ringSize)
+        .frame(width: columnWidth, height: columnHeight)
         .padding(.top, 6)
         .accessibilityLabel(indicator.label)
-    }
-
-    /// The progress ring: a full track, and an arc that starts at the top and
-    /// runs clockwise.
-    private func ring(_ value: Float) -> some View {
-        ZStack {
-            Circle()
-                .stroke(.quaternary, lineWidth: ringStroke)
-            Circle()
-                .trim(from: 0, to: CGFloat(value))
-                .stroke(Color.accentColor,
-                        style: StrokeStyle(lineWidth: ringStroke, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-        }
-        .frame(width: ringSize, height: ringSize)
     }
 }
