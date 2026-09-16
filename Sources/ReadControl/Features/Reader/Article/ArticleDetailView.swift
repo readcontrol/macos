@@ -171,14 +171,17 @@ struct ArticleDetailView: View {
             onHighlight: { text in
                 Task { await appState.toggleHighlight(id: row.id, text: text) }
             },
-            onScrollReady: { positionTracker.scrollReady($0) },
-            onScrollSettle: { positionTracker.scrollSettled($0) },
+            onScrollReady: { positionTracker.scrollReady($0, for: row.id) },
+            onScrollSettle: { positionTracker.scrollSettled($0, for: row.id) },
             header: { ArticleHeaderView(row: row, theme: theme) },
             footer: { ratingFooter(row: row) }
         )
         // A change of face, size, measure, or leading lays the text out again.
         // Keep the block the reader last saw at the top of the window.
         .onChange(of: typographyKey) { positionTracker.keepAnchor() }
+        // Hidden while the tracker goes to the stored block, so the article
+        // appears at its position and the scroll never jumps in view.
+        .opacity(positionTracker.hidesArticle ? 0 : 1)
     }
 
     /// The reader typography, as one value, so a change of any part of it is one

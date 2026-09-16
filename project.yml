@@ -102,8 +102,13 @@ targets:
       - path: Sources/ReadControl/Features/Reader/Markdown/InlineRenderer.swift
       - path: Sources/ReadControl/Features/Reader/Markdown/AppKitInline.swift
       - path: Sources/ReadControl/Features/Reader/Markdown/ReaderTextView.swift
-      # The reading-list row indicator: which of the dot, the ring, or nothing
-      # a row shows. A pure choice over a row, rendered by the row view.
+      # The reading-position tracker, with the two views that let it name the
+      # block at the top of the window, and the position it reads and reports.
+      - path: Sources/ReadControl/Features/Reader/Article/ReaderPositionTracker.swift
+      - path: Sources/ReadControl/Features/Reader/Markdown/BlockAnchorMarker.swift
+      - path: Sources/ReadControl/Bridge/Mappers/ReadingPosition.swift
+      # The reading-list row indicator: whether a row shows the unread dot or
+      # nothing. A pure choice over a row, rendered by the row view.
       - path: Sources/ReadControl/Features/ReadingList/ReadingIndicator.swift
       - path: Sources/ReadControl/Bridge/Mappers/ReadingRow.swift
       - path: Sources/ReadControl/Bridge/Mappers/SidebarCountModels.swift

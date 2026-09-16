@@ -31,13 +31,14 @@ extension ArticleDetailView {
             return
         }
 
-        row = appState.readings.first(where: { $0.id == id })
+        let newRow = appState.readings.first(where: { $0.id == id })
 
         // Short-circuit a pathological body straight to the oversize notice from the
         // cheap indexed word count — before fetching and parsing megabytes of text,
-        // the very cost this guard exists to avoid. `present`'s exact byte check
+        // the very cost this guard exists to avoid. `parse`'s exact byte check
         // still backstops a missing word count.
-        if let words = row?.wordCount, words > maxParseWords {
+        if let words = newRow?.wordCount, words > maxParseWords {
+            row = newRow
             articleDocument = nil
             bodyTooLarge = true
             isLoading = false
@@ -48,15 +49,18 @@ extension ArticleDetailView {
         // the cache — no re-parse, no spinner — then revalidate just this reading
         // below. Highlights are reloaded so toggles made elsewhere show.
         if let cached = cache.lookup(id) {
-            articleDocument = cached.document
-            bodyTooLarge = false
-            isLoading = false
             loadHighlightsInBackground(id: id)
-            await startTracking(id: id, document: cached.document)
+            // The previous reading stays on screen while the core reads the
+            // position file, thus the new reading appears at its position and
+            // never at the top first.
+            let position = await appState.position(id: id)
+            guard appState.selectedId == id else { return }
+            show(row: newRow, document: cached.document, id: id, position: position)
             await revalidate(id: id, cachedBody: cached.body)
             return
         }
 
+        row = newRow
         await loadUncached(id: id)
     }
 
@@ -70,55 +74,62 @@ extension ArticleDetailView {
         // `[![alt](img)](url)` are handled by the renderer), so no HTML
         // conversion or asset-path rewriting is needed. Parse here, off the
         // per-render path, so re-rendering the reader never re-parses.
+        async let position = appState.position(id: id)
         let body = await appState.getBody(id: id)
         // A load can be superseded while the body is in flight: `.task(id:)` cancels
-        // us, but neither the fetch above nor the detached parse in `present` observes
+        // us, but neither the fetch above nor the detached parse in `parse` observes
         // that cancellation. Bail before touching shared reader state so a stale load
         // can't paint over — or clear the spinner of — the reading now loading.
         guard appState.selectedId == id else { return }
-        await present(body: body, id: id)
+        guard let document = await parse(body: body, id: id) else {
+            if appState.selectedId == id { isLoading = false }
+            return
+        }
+        let stored = await position
         guard appState.selectedId == id else { return }
-        isLoading = false
+        show(row: row, document: document, id: id, position: stored)
     }
 
-    /// Show a freshly fetched body: parse, cache, and display it — unless it
-    /// exceeds `maxParseBytes`, in which case skip parsing entirely and flag it
-    /// so the reader shows the oversize notice. The parse runs off the main
-    /// thread (see `ArticleDocument.parse`), so a large article can't stall the
-    /// UI. A nil body (nothing fetched) clears the reader.
-    private func present(body: String?, id: String) async {
+    /// Parse and cache a freshly fetched body — unless it exceeds
+    /// `maxParseBytes`, in which case skip parsing entirely and flag it so the
+    /// reader shows the oversize notice. The parse runs off the main thread (see
+    /// `ArticleDocument.parse`), so a large article can't stall the UI. A nil
+    /// body (nothing fetched) clears the reader. Returns nil when there is
+    /// nothing to show.
+    private func parse(body: String?, id: String) async -> ArticleDocument? {
         guard let body else {
-            articleDocument = nil
-            bodyTooLarge = false
-            return
+            if appState.selectedId == id {
+                articleDocument = nil
+                bodyTooLarge = false
+            }
+            return nil
         }
         guard body.utf8.count <= maxParseBytes else {
             // Too large to render: don't parse, and don't keep any stale cache.
             cache.remove(id)
-            articleDocument = nil
-            bodyTooLarge = true
-            return
+            if appState.selectedId == id {
+                articleDocument = nil
+                bodyTooLarge = true
+            }
+            return nil
         }
-        bodyTooLarge = false
         let document = await ArticleDocument.parse(markdown: body)
         // Cache the finished parse under its own id even if the selection moved on
         // while it ran — the work is done and keyed by `id`, so revisiting hits the
         // cache instead of re-parsing.
         cache.store(body: body, document: document, for: id)
-        // A detached parse can outlive the selection that asked for it — don't paint
-        // it over the reading now on screen if the user moved on.
-        guard appState.selectedId == id else { return }
-        articleDocument = document
-        await startTracking(id: id, document: document)
+        return document
     }
 
-    /// Give the position tracker the article the reader now shows, with the
-    /// position the core stored for it. The tracker goes to that block, and from
-    /// then on it records the block at the top of the window.
+    /// Put the reading on screen, and give the position tracker the article with
+    /// the position the core stored for it.
     ///
-    /// The fetch of the position is one small file read, and it runs after the
-    /// article is on screen, so it never holds the reader back.
-    private func startTracking(id: String, document: ArticleDocument) async {
+    /// The tracker opens in the same tick as the article appears. Thus it hides
+    /// the article until the scroll is at the stored block, and the first frame
+    /// the user sees is already at that block.
+    private func show(row newRow: ReadingRow?, document: ArticleDocument, id: String,
+                      position: ReadingPosition?)
+    {
         positionTracker.onRecord = { readingID, anchor in
             Task {
                 await appState.recordPosition(id: readingID, block: anchor.block,
@@ -128,9 +139,11 @@ extension ArticleDetailView {
         positionTracker.onReachEnd = { readingID in
             Task { await appState.markRead(id: readingID) }
         }
-        let position = await appState.position(id: id)
-        guard appState.selectedId == id else { return }
         positionTracker.open(readingID: id, document: document, position: position)
+        row = newRow
+        articleDocument = document
+        bodyTooLarge = false
+        isLoading = false
     }
 
     /// Fetch the reading's highlights *off* the reader's critical path.
@@ -153,6 +166,9 @@ extension ArticleDetailView {
         let body = await appState.getBody(id: id)
         // Bail if the user moved on, or nothing changed.
         guard appState.selectedId == id, let body, body != cachedBody else { return }
-        await present(body: body, id: id)
+        guard let document = await parse(body: body, id: id), appState.selectedId == id else { return }
+        // The reading is already open, thus keep the scroll where the user is.
+        articleDocument = document
+        positionTracker.replaceDocument(document)
     }
 }
