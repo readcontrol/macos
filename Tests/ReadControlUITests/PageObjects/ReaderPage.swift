@@ -151,6 +151,46 @@ struct ReaderPage {
         poll(timeout: timeout) { abs(bodyWidth - expected) <= tolerance }
     }
 
+    // ── Scrolling ─────────────────────────────────────────────────────────────
+
+    /// The reader's own scroll view: the widest one on screen, since the reader
+    /// fills the detail column while the list and sidebar are narrower.
+    private var bodyScrollView: XCUIElement? {
+        app.scrollViews.allElementsBoundByIndex
+            .filter(\.exists)
+            .max { $0.frame.width < $1.frame.width }
+    }
+
+    /// Scroll the body down by `times` screens, then let the reader settle — it
+    /// records a position only once the scroll stopped (see `ReaderScrollProbe`).
+    func scrollBody(times: Int = 1, settle: Bool = true) {
+        for _ in 0 ..< times {
+            guard let scrollView = bodyScrollView else { break }
+            scrollView.swipeUp()
+        }
+        if settle {
+            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+        }
+    }
+
+    /// Whether the reader stands inside the body rather than at the top of the
+    /// article — the article header has left the visible area. XCUITest cannot
+    /// read a scroll offset on macOS 14, thus the header's own frame answers it.
+    var isScrolledPastHeader: Bool {
+        let header = app.staticTexts.matching(identifier: A11y.Detail.title).firstMatch
+        guard header.exists, let scrollView = bodyScrollView, scrollView.frame.height > 0 else {
+            return false
+        }
+        return header.frame.maxY <= scrollView.frame.minY
+    }
+
+    /// Polls until the reader is inside the body — a restore moves the scroll a
+    /// few frames after the article appears.
+    @discardableResult
+    func waitForScrolledPastHeader(timeout: TimeInterval = 8) -> Bool {
+        poll(timeout: timeout) { isScrolledPastHeader }
+    }
+
     // ── Image zoom lightbox ───────────────────────────────────────────────────
 
     /// The first tappable figure in the reader body.

@@ -160,6 +160,26 @@ class UITestCase: XCTestCase {
         return false
     }
 
+    /// Polls the on-disk `position.md` for `id` until `predicate(position)` holds
+    /// or `timeout` elapses — the file-is-the-truth check after the reader
+    /// recorded where the user stopped. The reader writes one time for each stop
+    /// of the scroll, thus the default timeout leaves room for the settle delay.
+    @discardableResult
+    func waitForPosition(
+        id: String,
+        timeout: TimeInterval = 10,
+        _ predicate: (PositionFile) -> Bool
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let position = library?.position(id: id), predicate(position) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
+    }
+
     /// Generic poll: waits until `condition()` holds or `timeout` elapses. For
     /// on-disk / cross-cutting assertions that aren't a single element or default.
     @discardableResult

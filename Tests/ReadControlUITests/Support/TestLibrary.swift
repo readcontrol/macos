@@ -112,6 +112,21 @@ final class TestLibrary {
         try? String(contentsOf: highlightsFileURL(id: articleId), encoding: .utf8)
     }
 
+    // ── Reading position ──────────────────────────────────────────────────
+
+    /// Whether the reading has a position file. The core deletes it when the
+    /// user goes back to the start, or when the reading is marked read.
+    func positionExists(id: String) -> Bool {
+        FileManager.default.fileExists(atPath: positionFileURL(id: id).path)
+    }
+
+    /// The parsed reading position for `id`, or nil when the file is absent or
+    /// still half-written.
+    func position(id: String) -> PositionFile? {
+        (try? String(contentsOf: positionFileURL(id: id), encoding: .utf8))
+            .flatMap(PositionFile.init(contents:))
+    }
+
     // ── URL accessors ─────────────────────────────────────────────────────
 
     func articleFileURL(id: String) -> URL {
@@ -120,6 +135,10 @@ final class TestLibrary {
 
     func highlightsFileURL(id: String) -> URL {
         readingDir(id: id).appendingPathComponent("highlights.md")
+    }
+
+    func positionFileURL(id: String) -> URL {
+        readingDir(id: id).appendingPathComponent("position.md")
     }
 
     // ── Teardown ────────────────────────────────────────────────────────────
