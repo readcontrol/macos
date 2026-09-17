@@ -37,7 +37,7 @@ protocol CoreBridging: Sendable {
 
     func getPosition(readingId: String) async throws -> FfiPosition?
     @discardableResult func setPosition(readingId: String, block: UInt32, quote: String,
-                                        percent: Float) async throws -> FfiPosition?
+                                        percent: Float, offset: Float) async throws -> FfiPosition?
     func clearPosition(readingId: String) async throws
 }
 

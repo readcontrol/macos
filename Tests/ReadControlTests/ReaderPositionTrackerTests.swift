@@ -25,7 +25,7 @@ final class ReaderPositionTrackerTests: XCTestCase {
     /// The stored position: the second block, with the quote the reader wrote.
     private var storedPosition: ReadingPosition {
         ReadingPosition(block: 1, quote: "First paragraph of the article.",
-                        percent: 0.2, changedAt: "2026-08-18T10:12:04.881Z")
+                        percent: 0.2, offset: 0, changedAt: "2026-08-18T10:12:04.881Z")
     }
 
     // ── Both orders ───────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ final class ReaderPositionTrackerTests: XCTestCase {
     func testRestoresAndRecordsWhenTheScrollArrivesBeforeTheReading() async throws {
         let tracker = ReaderPositionTracker()
         var recorded: [ArticleAnchors.Anchor] = []
-        tracker.onRecord = { _, anchor in recorded.append(anchor) }
+        tracker.onRecord = { _, anchor, _ in recorded.append(anchor) }
         let scrollView = makeScrollView()
 
         // The cached-parse order: the article is on screen, so its scroll view
@@ -56,7 +56,7 @@ final class ReaderPositionTrackerTests: XCTestCase {
     func testRestoresAndRecordsWhenTheReadingArrivesBeforeTheScroll() async throws {
         let tracker = ReaderPositionTracker()
         var recorded: [ArticleAnchors.Anchor] = []
-        tracker.onRecord = { _, anchor in recorded.append(anchor) }
+        tracker.onRecord = { _, anchor, _ in recorded.append(anchor) }
         let scrollView = makeScrollView()
 
         // The first-open order: the position is in hand before the article
@@ -79,7 +79,7 @@ final class ReaderPositionTrackerTests: XCTestCase {
     func testARestoreNeverRecords() async throws {
         let tracker = ReaderPositionTracker()
         var recorded: [ArticleAnchors.Anchor] = []
-        tracker.onRecord = { _, anchor in recorded.append(anchor) }
+        tracker.onRecord = { _, anchor, _ in recorded.append(anchor) }
         let scrollView = makeScrollView()
 
         tracker.open(readingID: "reading", document: ArticleDocument(markdown: body),
@@ -95,7 +95,7 @@ final class ReaderPositionTrackerTests: XCTestCase {
     func testAReadingWithoutAPositionRecordsFromTheStart() {
         let tracker = ReaderPositionTracker()
         var recorded: [ArticleAnchors.Anchor] = []
-        tracker.onRecord = { _, anchor in recorded.append(anchor) }
+        tracker.onRecord = { _, anchor, _ in recorded.append(anchor) }
         let scrollView = makeScrollView()
 
         tracker.scrollReady(scrollView, for: "reading")
@@ -110,7 +110,7 @@ final class ReaderPositionTrackerTests: XCTestCase {
     func testAStopOfThePreviousReadingIsDropped() {
         let tracker = ReaderPositionTracker()
         var recorded: [(id: String, block: Int)] = []
-        tracker.onRecord = { id, anchor in recorded.append((id, anchor.block)) }
+        tracker.onRecord = { id, anchor, _ in recorded.append((id, anchor.block)) }
         let previous = makeScrollView()
 
         tracker.open(readingID: "second", document: ArticleDocument(markdown: body),

@@ -132,15 +132,15 @@ actor CoreBridge {
     }
 
     /// Record where the user stopped: the index of the anchor block, the start
-    /// of that block, and the progress before it. Returns the stored position.
-    /// The core returns nil when it clears the position, because block 0 is the
-    /// start of the article.
+    /// of that block, the progress before it, and how far into the block the
+    /// stop is. Returns the stored position. The core returns nil when it clears
+    /// the position, because block 0 is the start of the article.
     @discardableResult
     func setPosition(readingId: String, block: UInt32, quote: String,
-                     percent: Float) throws -> FfiPosition?
+                     percent: Float, offset: Float) throws -> FfiPosition?
     {
         try database.setPosition(libraryPath: libraryPath, readingId: readingId,
-                                 block: block, quote: quote, percent: percent)
+                                 block: block, quote: quote, percent: percent, offset: offset)
     }
 
     /// Remove the reading position. The next open starts at the top.

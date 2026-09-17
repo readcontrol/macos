@@ -139,10 +139,11 @@ extension ArticleDetailView {
     private func show(row newRow: ReadingRow?, document: ArticleDocument, id: String,
                       position: ReadingPosition?)
     {
-        positionTracker.onRecord = { readingID, anchor in
+        positionTracker.onRecord = { readingID, anchor, offset in
             Task {
                 await appState.recordPosition(id: readingID, block: anchor.block,
-                                              quote: anchor.quote, percent: anchor.percent)
+                                              quote: anchor.quote, percent: anchor.percent,
+                                              offset: offset)
             }
         }
         positionTracker.onReachEnd = { readingID in

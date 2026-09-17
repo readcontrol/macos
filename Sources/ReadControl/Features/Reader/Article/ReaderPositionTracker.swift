@@ -32,8 +32,10 @@ final class ReaderPositionTracker {
     /// the article at its position and never sees the scroll move.
     private(set) var hidesArticle = false
 
-    /// Called with the anchor to store. The reader sends it to the core.
-    @ObservationIgnored var onRecord: (String, ArticleAnchors.Anchor) -> Void = { _, _ in }
+    /// Called with the anchor to store and how far into that block the stop is
+    /// (0.0 at the top of the block, 1.0 at its end). The reader sends both to
+    /// the core.
+    @ObservationIgnored var onRecord: (String, ArticleAnchors.Anchor, Float) -> Void = { _, _, _ in }
 
     /// Called once, when the user reaches the end of the article. The reader
     /// marks the reading read.
@@ -62,8 +64,14 @@ final class ReaderPositionTracker {
     @ObservationIgnored private var reportedEnd = false
     /// The block to go to, until a restore reaches it.
     @ObservationIgnored private var wanted: Int?
+    /// How far into `wanted` the restore must land, from the stored position.
+    @ObservationIgnored private var wantedOffset: Float = 0
     /// The block of the last report, so an unchanged anchor writes nothing.
     @ObservationIgnored private var lastRecorded: Int?
+    /// The fraction into `lastRecorded` of the last report, so a stop that only
+    /// moves inside a tall block still records, and a typography change keeps
+    /// the same place in the block (see `keepAnchor`).
+    @ObservationIgnored private var lastOffset: Float = 0
     /// True while a restore moves the scroll, so the move never records.
     @ObservationIgnored private var isRestoring = false
 
@@ -76,12 +84,16 @@ final class ReaderPositionTracker {
         self.document = document
         generation += 1
         lastRecorded = nil
+        lastOffset = 0
         userScrolled = false
         startOffset = nil
         reportedEnd = false
         wanted = position.flatMap {
             document.blockToRestore(block: $0.block, quote: $0.quote, percent: $0.percent)
         }
+        // Land at the same place inside the anchor block, not at its top — the
+        // difference the user sees on a tall image or a tall quote.
+        wantedOffset = position?.offset ?? 0
         // Hold every report until the restore ran, so the scroll the restore
         // itself makes never counts as a place the user stopped.
         isRestoring = (wanted ?? 0) > 0
@@ -131,7 +143,8 @@ final class ReaderPositionTracker {
         wanted = nil
         isRestoring = true
         let started = generation
-        Task { await restore(to: block, in: scrollView, generation: started) }
+        let offset = wantedOffset
+        Task { await restore(to: block, offset: offset, in: scrollView, generation: started) }
     }
 
     /// The scroll of the reading now open. Nil while the tracker still holds
@@ -166,10 +179,18 @@ final class ReaderPositionTracker {
             return
         }
 
-        guard let block = topBlock(in: scrollView), block != lastRecorded else { return }
+        guard let block = topBlock(in: scrollView) else { return }
+        let offsetIntoBlock = blockFraction(ofBlock: block, viewportTop: offset, in: scrollView)
+        // An unchanged block *and* an unchanged place inside it writes nothing.
+        // A stop that only moves inside a tall block still records, so coming
+        // back lands where the user is, not at the top of the block.
+        if block == lastRecorded, abs(offsetIntoBlock - lastOffset) < 0.01 {
+            return
+        }
         guard let anchor = document.anchors.anchor(at: block) else { return }
         lastRecorded = block
-        onRecord(readingID, anchor)
+        lastOffset = offsetIntoBlock
+        onRecord(readingID, anchor, offsetIntoBlock)
     }
 
     /// Whether the end of the article stands in the window.
@@ -190,29 +211,33 @@ final class ReaderPositionTracker {
         }
         isRestoring = true
         let started = generation
-        Task { await restore(to: block, in: scrollView, generation: started) }
+        let offset = lastRecorded != nil ? lastOffset : wantedOffset
+        Task { await restore(to: block, offset: offset, in: scrollView, generation: started) }
     }
 
     // ── Restore ───────────────────────────────────────────────────────────────
 
-    /// Move the scroll so `block` sits at the top of the window. The blocks lay
-    /// out lazily, thus this tries again: the first pass goes near the block by
-    /// its progress, and each later pass corrects with the real position of the
-    /// block. The restore stops when two passes find the block at the same
-    /// place, or when the reader opened another reading.
-    /// `started` is the generation when the restore was asked for.
-    private func restore(to block: Int, in scrollView: NSScrollView, generation started: Int) async {
+    /// Move the scroll so the point `offset` into `block` sits at the top of the
+    /// window. The blocks lay out lazily, thus this tries again: the first pass
+    /// goes near the block by its progress, and each later pass corrects with the
+    /// real position of the block. The restore stops when two passes find the
+    /// same place, or when the reader opened another reading. `started` is the
+    /// generation when the restore was asked for.
+    private func restore(to block: Int, offset: Float, in scrollView: NSScrollView,
+                         generation started: Int) async
+    {
         isRestoring = true
-        var previousTop: CGFloat?
+        var previousTarget: CGFloat?
         for pass in 0 ..< Self.restorePasses {
             guard generation == started else { return }
             scrollView.layoutSubtreeIfNeeded()
-            if let top = documentTop(ofBlock: block, in: scrollView) {
-                scroll(scrollView, to: top)
-                if let previousTop, abs(top - previousTop) < 1 {
+            if let extent = blockExtent(ofBlock: block, in: scrollView) {
+                let target = extent.top + CGFloat(offset) * extent.height
+                scroll(scrollView, to: target)
+                if let previousTarget, abs(target - previousTarget) < 1 {
                     break
                 }
-                previousTop = top
+                previousTarget = target
             } else if pass == 0, let percent = document?.anchors.anchor(at: block)?.percent {
                 scroll(scrollView, to: approximateTop(percent: percent, in: scrollView))
             }
@@ -222,6 +247,7 @@ final class ReaderPositionTracker {
         isRestoring = false
         wanted = nil
         lastRecorded = block
+        lastOffset = offset
         startOffset = scrollView.contentView.bounds.origin.y
         hidesArticle = false
     }
@@ -260,18 +286,38 @@ final class ReaderPositionTracker {
         return best
     }
 
-    /// Where the block starts, in the coordinates of the document view.
-    private func documentTop(ofBlock block: Int, in scrollView: NSScrollView) -> CGFloat? {
+    /// Where the block sits in the document view: the y of its top, and its
+    /// height. The reader needs the height to land inside the block, not only at
+    /// its top. A text run gives the block its run of text; the block below it in
+    /// the same run gives the bottom, or the bottom of the run for the last one.
+    /// A figure, table, or code block gives its own frame.
+    private func blockExtent(ofBlock block: Int, in scrollView: NSScrollView)
+        -> (top: CGFloat, height: CGFloat)?
+    {
         guard let documentView = scrollView.documentView else { return nil }
         for (view, frame) in anchorViews(in: documentView) {
             if let textView = view as? ReaderTextView, let local = textView.top(ofBlock: block) {
-                return frame.minY + local
+                let top = frame.minY + local
+                let bottom = (textView.top(ofBlock: block + 1).map { frame.minY + $0 }) ?? frame.maxY
+                return (top, max(bottom - top, 0))
             }
             if let marker = view as? BlockAnchorView, marker.block == block {
-                return frame.minY
+                return (frame.minY, frame.height)
             }
         }
         return nil
+    }
+
+    /// How far into `block` the window top sits, from 0.0 (the top of the block)
+    /// to 1.0 (its end). 0.0 when the block has no height to divide.
+    private func blockFraction(ofBlock block: Int, viewportTop: CGFloat,
+                               in scrollView: NSScrollView) -> Float
+    {
+        guard let extent = blockExtent(ofBlock: block, in: scrollView), extent.height > 0 else {
+            return 0
+        }
+        let fraction = (viewportTop - extent.top) / extent.height
+        return Float(min(max(fraction, 0), 1))
     }
 
     /// Every view that can name a block, with its frame in the document view.

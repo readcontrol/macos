@@ -10,6 +10,9 @@ struct ReadingPosition: Equatable, Sendable {
     var block: Int
     var quote: String
     var percent: Float
+    /// How far into the anchor block the stop is, from 0.0 to 1.0. 0.0 is the
+    /// top of the block. The reader lands inside the block, and not at its top.
+    var offset: Float
     /// The library format calls this field `at`.
     var changedAt: String
 }
@@ -20,6 +23,7 @@ extension ReadingPosition {
         block = Int(position.block)
         quote = position.quote
         percent = position.percent
+        offset = position.offset
         changedAt = position.at
     }
 }

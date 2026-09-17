@@ -16,11 +16,12 @@ extension AppState {
 
     /// Record where the user stopped. The core cleans the values, writes the
     /// file, and updates the index row. Block 0 is the start of the article,
-    /// which the core stores as "no position".
-    func recordPosition(id: String, block: Int, quote: String, percent: Float) async {
+    /// which the core stores as "no position". `offset` is how far into the
+    /// anchor block the stop is, from 0.0 to 1.0.
+    func recordPosition(id: String, block: Int, quote: String, percent: Float, offset: Float) async {
         guard let core, block >= 0 else { return }
         try? await core.setPosition(readingId: id, block: UInt32(block),
-                                    quote: quote, percent: percent)
+                                    quote: quote, percent: percent, offset: offset)
     }
 
     /// Remove the position, so the next open starts at the top.

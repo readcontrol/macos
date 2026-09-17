@@ -11,7 +11,7 @@ import Foundation
 ///
 /// ```markdown
 /// > The first line of the paragraph where the user stopped.
-/// <!-- pos block=42 percent=0.63 at=2026-08-18T10:12:04.881Z -->
+/// <!-- pos block=42 percent=0.63 offset=0.4 at=2026-08-18T10:12:04.881Z -->
 /// ```
 struct PositionFile {
     /// 0-based index of the anchor block in the body.
@@ -20,6 +20,9 @@ struct PositionFile {
     let quote: String
     /// The progress before the anchor block, from 0.0 to 1.0.
     let percent: Float
+    /// How far into the anchor block the stop is, from 0.0 to 1.0. Absent in the
+    /// file means 0.0, the top of the block.
+    let offset: Float
     /// The UTC time of the last change (the format calls this field `at`).
     let changedAt: String
 
@@ -55,6 +58,8 @@ struct PositionFile {
 
         self.block = block
         self.percent = percent
+        // Optional: a file from before the field, or a stop at a block top, has none.
+        offset = parsed["offset"].flatMap(Float.init) ?? 0
         self.changedAt = changedAt
         quote = quoteLines.joined(separator: " ")
     }
