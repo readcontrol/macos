@@ -15,7 +15,7 @@ DMG := dist/ReadControl.dmg
 # elsewhere: `make sparkle-sign SIGN_UPDATE=/path/to/sign_update`.
 SIGN_UPDATE ?=
 
-.PHONY: all xcframework bindings xcodegen test dmg release sparkle-sign clean format format-check lint lint-fix
+.PHONY: all xcframework bindings xcodegen run test dmg release sparkle-sign clean format format-check lint lint-fix
 
 all: xcframework bindings xcodegen
 
@@ -36,6 +36,24 @@ bindings: xcframework
 ## Regenerate the Xcode project from project.yml
 xcodegen:
 	xcodegen generate
+
+## Build a Debug ReadControl.app and launch it on this Mac (local dev run).
+## Rebuilds the engine, bindings, and project first (via `all`), so a change in
+## the Rust core is picked up. Ad-hoc signed — enough to run locally, not to
+## distribute (use `make dmg`/`make release` for that).
+run: all
+	xcodebuild build \
+	  -project ReadControl.xcodeproj \
+	  -scheme ReadControl \
+	  -configuration Debug \
+	  -derivedDataPath build \
+	  CODE_SIGNING_ALLOWED=NO
+	@app="build/Build/Products/Debug/ReadControl.app"; \
+	test -d "$$app" || { echo "error: $$app not found after build" >&2; exit 1; }; \
+	echo "==> Ad-hoc signing $$app"; \
+	codesign --force --deep --timestamp=none -s - "$$app"; \
+	echo "==> Launching $$app"; \
+	open "$$app"
 
 ## Run the test suites. The scheme runs the fast, hostless unit tests
 ## (ReadControlTests) before the UI suite, so logic regressions surface first.
